@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Skillshare Subtitle Downloader v4
+// @name         Skillshare 字幕下载 | Skillshare Subtitle Downloader v5
 // @namespace    http://tampermonkey.net/
-// @version      4
-// @description  Download Skillshare subtitle as SRT
+// @version      5
+// @description  下载 Skillshare 的字幕文件 (.srt 文件) | Download Skillshare subtitle as SRT
 // @author       Zheng Cheng
 // @match        https://www.skillshare.com/classes/*
 // @run-at       document-end
@@ -16,6 +16,8 @@
 // https://www.skillshare.com/classes/Words-With-Meaning-With-Olivia-Wilde/1045571583?via=logged-in-home-row-recommended-for-you&via=logged-in-home-row-recommended-for-you
 // https://www.skillshare.com/classes/WordPress-eCommerce-For-Beginners/360449142?via=logged-in-home-row-teachers-followed-published&via=logged-in-home-row-teachers-followed-published
 // https://www.skillshare.com/classes/Introduction-to-Cinema-4D-A-Beginners-Animation-Guide/897276610?via=browse-featured
+// https://www.skillshare.com/classes/Crafting-Memoir-How-to-Outline-Your-Own-Heros-Journey/2065711375?via=browse-featured
+// https://www.skillshare.com/classes/Inclusive-UX-Designing-Websites-for-Everyone/297973484?via=browse-featured
 
 (function () {
   'use strict';
@@ -47,13 +49,28 @@
     button2.textContent = get_download_current_episode_button_text()
     button2.addEventListener('click', download_current_episode_subtitles);
 
+    var button_css = `
+      font-size: 16px;
+      padding: 4px 18px;
+    `;
+
+    var button2_css = `
+      font-size: 16px;
+      padding: 4px 18px;
+      margin-left: 10px;
+    `;
+
     var div_css = `
-				margin-bottom: 10px;
-			`;
+			margin-bottom: 10px;
+		`;
+
+    button.setAttribute('style', button_css);
+    button2.setAttribute('style', button2_css);
     div.setAttribute('style', div_css);
+
     div.appendChild(button);
     div.appendChild(button2);
-    // title_element.appendChild(div);
+    
     insertAfter(div, title_element);
   }
 
@@ -321,11 +338,6 @@
     title_element = document.querySelector("div.class-details-header-title");
     if (title_element) {
       inject_our_script();
-    }
-    // 删掉一个碍事的元素
-    var staff_pick = document.querySelector('.class-details-header-badge.js-header-title-has-badge')
-    if (staff_pick) {
-      staff_pick.remove();
     }
   }
 
