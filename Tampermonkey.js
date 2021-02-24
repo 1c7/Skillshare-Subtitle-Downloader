@@ -1,11 +1,12 @@
 // ==UserScript==
-// @name         Skillshare Subtitle Downloader v3
+// @name         Skillshare Subtitle Downloader v4
 // @namespace    http://tampermonkey.net/
-// @version      3
+// @version      4
 // @description  Download Skillshare subtitle as SRT
 // @author       Zheng Cheng
 // @match        https://www.skillshare.com/classes/*
 // @run-at       document-end
+// @grant        unsafeWindow
 // ==/UserScript==
 
 // First created at 2020-2-24
@@ -14,17 +15,22 @@
 // https://www.skillshare.com/classes/The-Ultimate-Guide-to-Kinetic-Type-in-After-Effects/282677337/projects?via=logged-in-home-your-classes
 // https://www.skillshare.com/classes/Words-With-Meaning-With-Olivia-Wilde/1045571583?via=logged-in-home-row-recommended-for-you&via=logged-in-home-row-recommended-for-you
 // https://www.skillshare.com/classes/WordPress-eCommerce-For-Beginners/360449142?via=logged-in-home-row-teachers-followed-published&via=logged-in-home-row-teachers-followed-published
+// https://www.skillshare.com/classes/Introduction-to-Cinema-4D-A-Beginners-Animation-Guide/897276610?via=browse-featured
 
 (function () {
   'use strict';
 
   // 初始化一些必须的变量
-  var sessions = window.SS.serverBootstrap.pageData.unitsData.units[0].sessions
+  var sessions = null;
   var transcriptCuesArray = null;
   var div = document.createElement('div');
   var button = document.createElement('button'); // 下载全部字幕的按钮
   var button2 = document.createElement('button'); // 下载当前视频字幕的按钮
   var title_element = document.querySelector("div.class-details-header-title");
+
+  function insertAfter(newNode, referenceNode) {
+    referenceNode.parentNode.insertBefore(newNode, referenceNode.nextSibling);
+  }
 
   // 注入
   async function inject_our_script() {
@@ -42,13 +48,13 @@
     button2.addEventListener('click', download_current_episode_subtitles);
 
     var div_css = `
-				background-color: #00B75A;
-				margin-left: 10px;
+				margin-bottom: 10px;
 			`;
     div.setAttribute('style', div_css);
     div.appendChild(button);
     div.appendChild(button2);
-    title_element.appendChild(div);
+    // title_element.appendChild(div);
+    insertAfter(div, title_element);
   }
 
   // 把 cue 遍历一下，得到一个特定格式的对象数组
@@ -146,6 +152,8 @@
 
   // 下载所有集的字幕
   async function download_subtitles() {
+    sessions = unsafeWindow.SS.serverBootstrap.pageData.unitsData.units[0].sessions
+
     for (let key in transcriptCuesArray) {
       var value = transcriptCuesArray[key];
       var srt = parse_content_array_to_SRT(value.content);
@@ -299,7 +307,6 @@
 
   // 转换成安全的文件名
   function safe_filename(string) {
-    // return string.replace(/[^a-z0-9]/gi, '_').toLowerCase();
     return string.replace(':', '-')
   }
 
@@ -311,7 +318,7 @@
   // 程序入口
   function init() {
     // 如果有标题才执行
-    var title_element = document.querySelector("div.class-details-header-title");
+    title_element = document.querySelector("div.class-details-header-title");
     if (title_element) {
       inject_our_script();
     }
