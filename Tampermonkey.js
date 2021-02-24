@@ -61,8 +61,8 @@
     `;
 
     var div_css = `
-			margin-bottom: 10px;
-		`;
+      margin-bottom: 10px;
+    `;
 
     button.setAttribute('style', button_css);
     button2.setAttribute('style', button2_css);
@@ -70,7 +70,7 @@
 
     div.appendChild(button);
     div.appendChild(button2);
-    
+
     insertAfter(div, title_element);
   }
 
@@ -311,7 +311,6 @@
   })
 
   function get_download_current_episode_button_text() {
-    // return `下载当前集`
     return `下载当前集 (${get_filename()}.srt)`
   }
 
