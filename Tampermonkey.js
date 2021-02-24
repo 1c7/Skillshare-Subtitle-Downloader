@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Skillshare Subtitle Downloader v2
+// @name         Skillshare Subtitle Downloader v3
 // @namespace    http://tampermonkey.net/
-// @version      2
+// @version      3
 // @description  Download Skillshare subtitle as SRT
 // @author       Zheng Cheng
 // @match        https://www.skillshare.com/classes/*
@@ -305,9 +305,15 @@
 
   // 程序入口
   function init() {
+    // 如果有标题才执行
     var title_element = document.querySelector("div.class-details-header-title");
     if (title_element) {
       inject_our_script();
+    }
+    // 删掉一个碍事的元素
+    var staff_pick = document.querySelector('.class-details-header-badge.js-header-title-has-badge')
+    if (staff_pick) {
+      staff_pick.remove();
     }
   }
 
