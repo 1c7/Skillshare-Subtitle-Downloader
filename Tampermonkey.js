@@ -5,8 +5,7 @@
 // @description  Download Skillshare subtitle as SRT
 // @author       Zheng Cheng
 // @match        https://www.skillshare.com/classes/*
-// @grant        none
-// @run-at document-end
+// @run-at       document-end
 // ==/UserScript==
 
 // First created at 2020-2-24
@@ -19,7 +18,7 @@
 (function () {
   'use strict';
 
-  // 一些全局变量
+  // 初始化一些必须的变量
   var sessions = window.SS.serverBootstrap.pageData.unitsData.units[0].sessions
   var transcriptCuesArray = null;
   var div = document.createElement('div');
@@ -77,7 +76,7 @@
     downloadString(srt, "text/plain", filename);
   }
 
-  // CSRF, 没啥可说的
+  // CSRF
   function csrf() {
     return SS.serverBootstrap.parentClassData.formData.csrfTokenValue
   }
@@ -122,21 +121,40 @@
     })
   }
 
+  // 输入: id
+  // 输出: sessions 数组里的一个对象
+  function id_to_obj(id) {
+    var array = sessions
+    for (var i = 0; i < array.length; i++) {
+      var one = array[i];
+      if (one.id == id) {
+        return one
+      }
+    }
+    return null
+  }
+
+  // 输入: id
+  // 输出: 文件名 (xxx.srt)
+  function get_filename_by_id(id) {
+    var obj = id_to_obj(id);
+    var rank = obj.displayRank;
+    var title = obj.title
+    var filename = `${rank}.${safe_filename(title)}.srt`
+    return filename
+  }
+
   // 下载所有集的字幕
   async function download_subtitles() {
     for (let key in transcriptCuesArray) {
       var value = transcriptCuesArray[key];
       var srt = parse_content_array_to_SRT(value.content);
-      var id = key;
-      var obj = id_to_obj(id);
-      // console.log(obj);
-      var rank = obj.displayRank;
-      var title = obj.title
-      var filename = `${rank}.${safe_filename(title)}.srt`
-      await sleep(1000);
-      // // 如果不 sleep，下载大概11个文件就会停下来（不会报错，但就是停下来了）
-      // // sleep 可以把全部42个文件下载下来
+      var filename = get_filename_by_id(key)
       downloadString(srt, "text/plain", filename);
+
+      await sleep(1000);
+      // 如果不 sleep，下载大概11个文件就会停下来（不会报错，但就是停下来了）
+      // sleep 可以把全部42个文件下载下来
     }
   }
 
@@ -259,19 +277,6 @@
     setTimeout(function () {
       URL.revokeObjectURL(a.href);
     }, 11500);
-  }
-
-  // 输入: id
-  // 输出: sessions 数组里的一个对象
-  function id_to_obj(id) {
-    var array = sessions
-    for (var i = 0; i < array.length; i++) {
-      var one = array[i];
-      if (one.id == id) {
-        return one
-      }
-    }
-    return null
   }
 
   // 切换了视频会触发这个事件
