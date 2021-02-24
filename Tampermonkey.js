@@ -10,14 +10,9 @@
 // ==/UserScript==
 
 // First created at 2020-2-24
-// Tested with 
-// https://www.skillshare.com/classes/Logo-Design-Mastery-The-Full-Course/1793713747
-// https://www.skillshare.com/classes/The-Ultimate-Guide-to-Kinetic-Type-in-After-Effects/282677337/projects?via=logged-in-home-your-classes
-// https://www.skillshare.com/classes/Words-With-Meaning-With-Olivia-Wilde/1045571583?via=logged-in-home-row-recommended-for-you&via=logged-in-home-row-recommended-for-you
-// https://www.skillshare.com/classes/WordPress-eCommerce-For-Beginners/360449142?via=logged-in-home-row-teachers-followed-published&via=logged-in-home-row-teachers-followed-published
-// https://www.skillshare.com/classes/Introduction-to-Cinema-4D-A-Beginners-Animation-Guide/897276610?via=browse-featured
-// https://www.skillshare.com/classes/Crafting-Memoir-How-to-Outline-Your-Own-Heros-Journey/2065711375?via=browse-featured
-// https://www.skillshare.com/classes/Inclusive-UX-Designing-Websites-for-Everyone/297973484?via=browse-featured
+// 总结：
+// 1. 下载一门课程全部字幕（多个 .srt 文件）原理是利用 transcriptCuesArray，字幕数据都在里面，进行格式转换+保存即可
+// 2. 下载当前视频的字幕（一个 .srt 文件）原理是用 videojs 里 textTracks 的 cue，进行格式转换+保存即可
 
 (function () {
   'use strict';
