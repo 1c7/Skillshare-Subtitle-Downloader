@@ -1,7 +1,7 @@
 // ==UserScript==
-// @name         Skillshare Subtitle Downloader v1
+// @name         Skillshare Subtitle Downloader v2
 // @namespace    http://tampermonkey.net/
-// @version      1
+// @version      2
 // @description  Download Skillshare subtitle as SRT
 // @author       Zheng Cheng
 // @match        https://www.skillshare.com/classes/*
@@ -10,6 +10,11 @@
 // ==/UserScript==
 
 // First created at 2020-2-24
+// Tested with 
+// https://www.skillshare.com/classes/Logo-Design-Mastery-The-Full-Course/1793713747
+// https://www.skillshare.com/classes/The-Ultimate-Guide-to-Kinetic-Type-in-After-Effects/282677337/projects?via=logged-in-home-your-classes
+// https://www.skillshare.com/classes/Words-With-Meaning-With-Olivia-Wilde/1045571583?via=logged-in-home-row-recommended-for-you&via=logged-in-home-row-recommended-for-you
+// https://www.skillshare.com/classes/WordPress-eCommerce-For-Beginners/360449142?via=logged-in-home-row-teachers-followed-published&via=logged-in-home-row-teachers-followed-published
 
 (function () {
   'use strict';
@@ -79,7 +84,13 @@
 
   // 拿到当前课程的 URL (不带任何参数或者 section，不带 /projects 或 /transcripts 在 URL 最后)
   function course_url() {
-    return SS.serverBootstrap.loginPopupRedirectTo
+    var url1 = SS.serverBootstrap.loginPopupRedirectTo
+    var url2 = window.location.origin + window.location.pathname
+    if (url1) {
+      return url1
+    } else {
+      return url2
+    }
     // return document.querySelector('meta[property="og:url"]').content // 这个不可靠
     // 比如: 
     // https://www.skillshare.com/classes/Logo-Design-Mastery-The-Full-Course/1793713747
@@ -295,7 +306,6 @@
   // 程序入口
   function init() {
     var title_element = document.querySelector("div.class-details-header-title");
-    console.log(title_element);
     if (title_element) {
       inject_our_script();
     }
