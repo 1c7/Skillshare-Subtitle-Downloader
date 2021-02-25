@@ -10,4 +10,4 @@
 ## 安装
 1. 用 Chrome 浏览器
 2. 安装 Tampermonkey 插件
-3. https://greasyfork.org/zh-CN/scripts/422247-skillshare-subtitle-downloader-v1
+3. https://greasyfork.org/zh-CN/scripts/422247-skillshare-%E5%AD%97%E5%B9%95%E4%B8%8B%E8%BD%BD-skillshare-subtitle-downloader-v5
