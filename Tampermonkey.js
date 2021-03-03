@@ -1,16 +1,18 @@
 // ==UserScript==
-// @name         Skillshare 字幕下载 | Skillshare Subtitle Downloader v5
-// @namespace    http://tampermonkey.net/
-// @version      5
-// @description  下载 Skillshare 的字幕文件 (.srt 文件) | Download Skillshare subtitle as SRT
+// @name:zh-CN   Skillshare 字幕下载 v6
+// @name         Skillshare Subtitle Downloader v6
+// @namespace    https://greasyfork.org/users/5711
+// @version      6
+// @description:zh-CN  下载 Skillshare 的字幕文件 (.srt 文件)
+// @description  Download Skillshare Subtitle as .srt file
 // @author       Zheng Cheng
 // @match        https://www.skillshare.com/classes/*
 // @run-at       document-end
 // @grant        unsafeWindow
 // ==/UserScript==
 
-// First created at 2020-2-24
-// 总结：
+// 写于 2020-2-24
+// [工作原理]
 // 1. 下载一门课程全部字幕（多个 .srt 文件）原理是利用 transcriptCuesArray，字幕数据都在里面，进行格式转换+保存即可
 // 2. 下载当前视频的字幕（一个 .srt 文件）原理是用 videojs 里 textTracks 的 cue，进行格式转换+保存即可
 
@@ -327,7 +329,7 @@
   }
 
   // 程序入口
-  function init() {
+  function main() {
     // 如果有标题才执行
     title_element = document.querySelector("div.class-details-header-title");
     if (title_element) {
@@ -335,5 +337,5 @@
     }
   }
 
-  setTimeout(init, 3000);
+  setTimeout(main, 3000);
 })();
