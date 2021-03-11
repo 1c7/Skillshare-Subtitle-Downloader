@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name:zh-CN   Skillshare 字幕下载 v8
-// @name         Skillshare Subtitle Downloader v8
+// @name:zh-CN   Skillshare 字幕下载 v9
+// @name         Skillshare Subtitle Downloader v9
 // @namespace    https://greasyfork.org/users/5711
-// @version      8
+// @version      9
 // @description:zh-CN  支持下载 Skillshare 的字幕 (.srt 文件) 以及 下载视频 (.mp4)
 // @description  Download Skillshare Subtitle as .srt file
 // @author       Zheng Cheng
@@ -20,6 +20,8 @@
 
 // [更新日志]
 // v7（2021-3-11）: 可以下载视频，包括当前视频，以及从当前视频开始一直到最后一个视频。
+// v8（2021-3-11）: 整理代码
+// v9（2021-3-11）: 改进了批量下载视频时，文件名的构造方法
 
 // [注意]
 // 必须 @run-at document-start，因为批量下载视频的部分需要尽早拦截 XMLHttpRequest.prototype.setRequestHeader
@@ -240,6 +242,26 @@
     return null
   }
 
+  // videoId: "bc:6053324155001"
+  function video_id_to_obj(video_id) {
+    var string = `bc:${video_id}`
+    var array = sessions
+    for (var i = 0; i < array.length; i++) {
+      var one = array[i];
+      if (one.videoId == string) {
+        return one
+      }
+    }
+    return null
+  }
+
+  function get_filename_by_video_id(video_id) {
+    var obj = video_id_to_obj(video_id)
+    var rank = obj.displayRank
+    var filename = `${rank}. ${safe_filename(obj.title)}`
+    return filename
+  }
+
   // 输入: id
   // 输出: 文件名 (xxx.srt)
   function get_filename_by_id(id) {
@@ -252,8 +274,6 @@
 
   // 下载所有集的字幕
   async function download_subtitles() {
-    sessions = unsafeWindow.SS.serverBootstrap.pageData.unitsData.units[0].sessions
-
     for (let key in transcriptCuesArray) {
       var value = transcriptCuesArray[key];
       var srt = parse_content_array_to_SRT(value.content);
@@ -282,13 +302,16 @@
         var response = await get_single_video_data(video_id); // 拿到 JSON 返回
 
         var video_link = find_video_link(response.sources); // 视频链接
-        var rank = session.displayRank // 视频编号
-        var filename = `${rank}. ${safe_filename(response.name)}.mp4`; // 文件名
+        var filename = `${get_filename_by_video_id(response.id)}.mp4`; // 文件名
+
         if (video_link.startsWith('http://')) {
           video_link = video_link.replace('http://', 'https://')
         }
-        console.log(video_link);
-        console.log(filename);
+
+        // console.log(video_link);
+        // console.log(filename);
+        // console.log(response);
+        // console.log('--------------');
         await download_video(video_link, 'video/mp4', filename); // 下载
       }
     }
@@ -480,6 +503,7 @@
     title_element = document.querySelector("div.class-details-header-title");
     if (title_element) {
       inject_our_script();
+      sessions = unsafeWindow.SS.serverBootstrap.pageData.unitsData.units[0].sessions
     }
   }
 
