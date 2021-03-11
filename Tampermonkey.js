@@ -1,17 +1,19 @@
 // ==UserScript==
-// @name:zh-CN   Skillshare 字幕下载 v7
-// @name         Skillshare Subtitle Downloader v7
+// @name:zh-CN   Skillshare 字幕下载 v8
+// @name         Skillshare Subtitle Downloader v8
 // @namespace    https://greasyfork.org/users/5711
-// @version      7
-// @description:zh-CN  下载 Skillshare 的字幕文件 (.srt 文件)
+// @version      8
+// @description:zh-CN  支持下载 Skillshare 的字幕 (.srt 文件) 以及 下载视频 (.mp4)
 // @description  Download Skillshare Subtitle as .srt file
 // @author       Zheng Cheng
 // @match        https://www.skillshare.com/classes/*
 // @run-at       document-start
 // @grant        unsafeWindow
+// @license      MIT
+// @supportURL   guokrfans@gmail.com
 // ==/UserScript==
 
-// 写于 2020-2-24
+// 最初写于 2020-2-24
 // [工作原理]
 // 1. 下载一门课程全部字幕（多个 .srt 文件）原理是利用 transcriptCuesArray，字幕数据都在里面，进行格式转换+保存即可
 // 2. 下载当前视频的字幕（一个 .srt 文件）原理是用 videojs 里 textTracks 的 cue，进行格式转换+保存即可
@@ -19,44 +21,41 @@
 // [更新日志]
 // v7（2021-3-11）: 可以下载视频，包括当前视频，以及从当前视频开始一直到最后一个视频。
 
+// [注意]
+// 必须 @run-at document-start，因为批量下载视频的部分需要尽早拦截 XMLHttpRequest.prototype.setRequestHeader
+
 (function () {
   'use strict';
 
+  // ==== 这一段的目的，是为了把一个请求头存起来，之后我们自己发请求时用得上 ====
   // 有的 http 请求，比如获得视频信息的那个 https://edge.api.brightcove.com/playback/v1/accounts/3695997568001/videos/6173466475001
   // 需要一个请求头，Accept: application/json;pk=BCpkADawqM2OOcM6njnM7hf9EaK6lIFlqiXB0iWjqGWUQjU7R8965xUvIQNqdQbnDTLz0IAO7E6Ir2rIbXJtFdzrGtitoee0n1XXRliD-RH9A-svuvNW9qgo3Bh34HEZjXjG4Nml4iyz3KqF
   // pk 是 policy key 的缩写（因为响应头里面明确写了 Policy-Key-Raw )
-  var request_header_accept = null
+  // 由于这个 Accept: application/json;pk= 完全无法在页面中获取到（应该是用代码生成的）我们只能使用这样的截取方式
 
-  // 由于这个 Accept: application/json;pk= 完全无法在页面中获取到，我们只能使用这样的截取方式
+  var request_header_accept = null
   XMLHttpRequest.prototype.real_setRequestHeader = XMLHttpRequest.prototype.setRequestHeader
   XMLHttpRequest.prototype.setRequestHeader = function (header, value) {
-    // console.log(header, value);
     if (header == 'Accept' && value.startsWith('application/json;pk=')) {
       request_header_accept = value; // 如果两个条件都对，就存起来
       console.log(`找到了!`);
       console.log(request_header_accept);
+      // 还好找到了这样的方式，不然我就去写 Chrome Extension 了（麻烦多了，安装也麻烦，开发也麻烦）
     }
     this.real_setRequestHeader(header, value);
   }
+  // ==== 这一段的目的，是为了把一个请求头存起来，之后我们自己发请求时用得上 ====
 
-  // 说明
-  // policy_key 仅用于下载全部视频, 其他功能不需要
-  // 只能从一个获取视频数据的 http 请求里的请求头/响应头拿到。应该是代码构建的，页面里没法搜索到。
-  // 就只能这样写死了。
 
-  // 获取方法 Chrome 开发者工具 -> Network -> 搜索 edge.api.brightcove.com/playback
-  // 应该只会显示一条，复制 Policy-Key-Raw: BCpkADawqM2OOcM6njnM7hf9EaK6lIFlqiXB0iWjqGWUQjU7R8965xUvIQNqdQbnDTLz0IAO7E6Ir2rIbXJtFdzrGtitoee0n1XXRliD-RH9A-svuvNW9qgo3Bh34HEZjXjG4Nml4iyz3KqF
-  // 冒号后面这一段
-
-  // 初始化一些必须的变量
-  var sessions = null;
-  var transcriptCuesArray = null;
+  // 初始化变量
+  var sessions = null; // 存一个 sessions 数组 (Skillshare 提供的)
+  var transcriptCuesArray = null; // 用途同上
   var div = document.createElement('div');
   var button = document.createElement('button'); // 下载全部字幕的按钮
   var button2 = document.createElement('button'); // 下载当前视频字幕的按钮
   var button3 = document.createElement('button'); // 下载当前视频的按钮
   var button4 = document.createElement('button'); // 下载全部视频的按钮
-  var title_element = document.querySelector("div.class-details-header-title");
+  var title_element = document.querySelector("div.class-details-header-title"); // 标题元素
 
   function insertAfter(newNode, referenceNode) {
     referenceNode.parentNode.insertBefore(newNode, referenceNode.nextSibling);
@@ -114,15 +113,10 @@
     insertAfter(div, title_element);
   }
 
-  // 下载当前这一集的视频
+  // 下载当前这集视频
   function download_current_episode_video() {
     var vjs = videojs(document.querySelector('video'))
-    var video_link = null;
-    var video_type = null;
-
-    // 在数组里找到 *.mp4 的链接
     var video_link = find_video_link(vjs.mediainfo.sources)
-
     if (video_link != null) {
       var filename = `${get_filename()}.mp4`
       fetch(video_link)
@@ -133,6 +127,7 @@
     }
   }
 
+  // 下载单个视频, 用法参照其他地方
   function download_video(video_link, filetype, filename) {
     return new Promise((resolve, reject) => {
       fetch(video_link)
@@ -158,6 +153,7 @@
         break;
       }
     }
+
     return video_link
   }
 
@@ -270,134 +266,18 @@
     }
   }
 
-  // 下载全部视频
+  // 从当前视频开始下载
   async function download_all_video() {
-    // 发请求给
-    // https://edge.api.brightcove.com/playback/v1/accounts/3695997568001/videos/6234379709001
-    // var example_return = {
-    //   "poster": "https://cf-images.us-east-1.prod.boltdns.net/v1/jit/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/main/1280x720/5m3s296ms/match/image.jpg",
-    //   "thumbnail": "https://cf-images.us-east-1.prod.boltdns.net/v1/jit/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/main/160x90/5m3s296ms/match/image.jpg",
-    //   "poster_sources": [{
-    //     "src": "https://cf-images.us-east-1.prod.boltdns.net/v1/jit/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/main/1280x720/5m3s296ms/match/image.jpg"
-    //   }],
-    //   "thumbnail_sources": [{
-    //     "src": "https://cf-images.us-east-1.prod.boltdns.net/v1/jit/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/main/160x90/5m3s296ms/match/image.jpg"
-    //   }],
-    //   "description": null,
-    //   "tags": [],
-    //   "cue_points": [],
-    //   "custom_fields": {},
-    //   "account_id": "3695997568001",
-    //   "sources": [{
-    //     "codecs": "avc1,mp4a",
-    //     "ext_x_version": "3",
-    //     "src": "http://manifest.prod.boltdns.net/manifest/v1/hls/v3/clear/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/10s/master.m3u8?fastly_token=NjA0YTJmODlfNDM1MjYyMjJmY2QzMWJmZTkzNTg3MWU1MmFjMTAwOGU2ODQwNjBhMjNiYWY5YmFiYWJmNjk0YzA2ZGRjZTQ5ZA%3D%3D",
-    //     "type": "application/x-mpegURL"
-    //   }, {
-    //     "codecs": "avc1,mp4a",
-    //     "ext_x_version": "3",
-    //     "src": "https://manifest.prod.boltdns.net/manifest/v1/hls/v3/clear/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/10s/master.m3u8?fastly_token=NjA0YTJmODlfNDM1MjYyMjJmY2QzMWJmZTkzNTg3MWU1MmFjMTAwOGU2ODQwNjBhMjNiYWY5YmFiYWJmNjk0YzA2ZGRjZTQ5ZA%3D%3D",
-    //     "type": "application/x-mpegURL"
-    //   }, {
-    //     "codecs": "avc1,mp4a",
-    //     "ext_x_version": "4",
-    //     "src": "http://manifest.prod.boltdns.net/manifest/v1/hls/v4/clear/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/10s/master.m3u8?fastly_token=NjA0YTJmODlfYTcyZDI3Njg5MjhjZTRhY2I1ZjFkOWM5YjU4OGQzZjg5ZjhkZjI3YWNmODI5MDg5YTRiZDMyYjRmMGZkYWY3OQ%3D%3D",
-    //     "type": "application/x-mpegURL"
-    //   }, {
-    //     "codecs": "avc1,mp4a",
-    //     "ext_x_version": "4",
-    //     "src": "https://manifest.prod.boltdns.net/manifest/v1/hls/v4/clear/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/10s/master.m3u8?fastly_token=NjA0YTJmODlfYTcyZDI3Njg5MjhjZTRhY2I1ZjFkOWM5YjU4OGQzZjg5ZjhkZjI3YWNmODI5MDg5YTRiZDMyYjRmMGZkYWY3OQ%3D%3D",
-    //     "type": "application/x-mpegURL"
-    //   }, {
-    //     "codecs": "avc1,mp4a",
-    //     "profiles": "urn:mpeg:dash:profile:isoff-live:2011",
-    //     "src": "http://manifest.prod.boltdns.net/manifest/v1/dash/live-baseurl/clear/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/6s/manifest.mpd?fastly_token=NjA0YTJmODlfMjViY2ZlZGM0MDczZmJlZmE2MzNhODVhYzYwM2QwODIyYTk1NGYxNDE5ZmQ4N2Q4ZDg1YjM5YTBmODNhYmE5NQ%3D%3D",
-    //     "type": "application/dash+xml"
-    //   }, {
-    //     "codecs": "avc1,mp4a",
-    //     "profiles": "urn:mpeg:dash:profile:isoff-live:2011",
-    //     "src": "https://manifest.prod.boltdns.net/manifest/v1/dash/live-baseurl/clear/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/6s/manifest.mpd?fastly_token=NjA0YTJmODlfMjViY2ZlZGM0MDczZmJlZmE2MzNhODVhYzYwM2QwODIyYTk1NGYxNDE5ZmQ4N2Q4ZDg1YjM5YTBmODNhYmE5NQ%3D%3D",
-    //     "type": "application/dash+xml"
-    //   }, {
-    //     "avg_bitrate": 1407000,
-    //     "codec": "H264",
-    //     "container": "MP4",
-    //     "duration": 606592,
-    //     "height": 720,
-    //     "size": 107252789,
-    //     "src": "http://bcbolt446c5271-a.akamaihd.net/media/v1/pmp4/static/clear/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/c7d34e08-b1d7-468d-91b8-c72987f80fcb/main.mp4?akamai_token=exp=1615474569~acl=/media/v1/pmp4/static/clear/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/c7d34e08-b1d7-468d-91b8-c72987f80fcb/main.mp4*~hmac=2aea87178e6e66183d8d4b0bfd604850cdf627218ab577693ff77d9d568324bf",
-    //     "width": 1280
-    //   }, {
-    //     "avg_bitrate": 1407000,
-    //     "codec": "H264",
-    //     "container": "MP4",
-    //     "duration": 606592,
-    //     "height": 720,
-    //     "size": 107252789,
-    //     "src": "https://bcbolt446c5271-a.akamaihd.net/media/v1/pmp4/static/clear/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/c7d34e08-b1d7-468d-91b8-c72987f80fcb/main.mp4?akamai_token=exp=1615474569~acl=/media/v1/pmp4/static/clear/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/c7d34e08-b1d7-468d-91b8-c72987f80fcb/main.mp4*~hmac=2aea87178e6e66183d8d4b0bfd604850cdf627218ab577693ff77d9d568324bf",
-    //     "width": 1280
-    //   }],
-    //   "name": "Stocks App: Generic Network Manager",
-    //   "reference_id": null,
-    //   "long_description": null,
-    //   "duration": 606592,
-    //   "economics": "AD_SUPPORTED",
-    //   "text_tracks": [{
-    //     "id": "c807c2f3-ae06-454c-9048-137a294fa75a",
-    //     "account_id": "3695997568001",
-    //     "src": "https://www.skillshare.com/transcripts/a6b235a0-0130-4651-94ba-de065673f7b2/text.vtt?ts=20210222171013",
-    //     "srclang": "en",
-    //     "label": "English",
-    //     "kind": "captions",
-    //     "mime_type": "text/vtt",
-    //     "asset_id": null,
-    //     "sources": [{
-    //       "src": "https://www.skillshare.com/transcripts/a6b235a0-0130-4651-94ba-de065673f7b2/text.vtt?ts=20210222171013"
-    //     }],
-    //     "default": true
-    //   }],
-    //   "published_at": "2021-02-22T16:51:12.376Z",
-    //   "created_at": "2021-02-22T16:51:12.362Z",
-    //   "updated_at": "2021-02-22T17:10:13.636Z",
-    //   "offline_enabled": false,
-    //   "link": null,
-    //   "id": "6234379709001",
-    //   "ad_keys": null
-    // }
-
-    // https://edge.api.brightcove.com/playback/v1/accounts/3695997568001/videos/6234379709001
-    // 分析一下: 3695997568001 和 6234379709001 是什么？
-    // 返回的数据可以看到是 account_id: "3695997568001"，那么这个是当前账户的 id
-    // 第二个 6234379709001 应该是视频的 id
-    // 问：这两项数据如何获取？
-
-    // 如何获取 account_id？
-    // SS.serverBootstrap.pageData.videoPlayerData.brightcoveAccountId
-
-    // 如何获取 video_id？
-    // pageData.videoPlayerData.units[0].sessions[0].videoId
-    // videoId: "bc:6234378710001"
-
-    // 如果要下载全部视频
-    // 思路：遍历 pageData.videoPlayerData.units[0].sessions
-    // 里面每一个就是一个视频，然后发请求获得数据，然后下载
-    // var sessions = unsafeWindow.SS.serverBootstrap.pageData.videoPlayerData.units[0].sessions
-    // for (var i = 0; i < sessions.length; i++) {
-    //   var session = sessions[i];
-    //   var video_id = session.videoId.split(':')[1];
-    //   var response = await get_single_video_data(video_id);
-    //   var video_link = find_video_link(response.sources);
-    //   var filename = safe_filename(response.name)
-    //   await download_video(video_link, 'video/mp4', filename)
-    // }
-
-    // 假设从当前视频开始下载
+    // 当前 session
     var startingSession = unsafeWindow.SS.serverBootstrap.pageData.videoPlayerData.startingSession
+
+    // 全部 session
     var sessions = unsafeWindow.SS.serverBootstrap.pageData.videoPlayerData.units[0].sessions
+
     for (var i = 0; i < sessions.length; i++) {
       var session = sessions[i];
       var displayRank = session.displayRank;
-      if (displayRank >= startingSession.displayRank) {
+      if (displayRank >= startingSession.displayRank) { // 从当前视频开始下载（包括当前视频）一直下载到最后一个
         var video_id = session.videoId.split(':')[1]; // 视频 ID
         var response = await get_single_video_data(video_id); // 拿到 JSON 返回
 
