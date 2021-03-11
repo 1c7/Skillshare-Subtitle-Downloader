@@ -242,9 +242,10 @@
     return null
   }
 
-  // videoId: "bc:6053324155001"
+  // 输入: video_id
+  // 输出: session 里那条纪录
   function video_id_to_obj(video_id) {
-    var string = `bc:${video_id}`
+    var string = `bc:${video_id}` // videoId: "bc:6053324155001"
     var array = sessions
     for (var i = 0; i < array.length; i++) {
       var one = array[i];
@@ -255,6 +256,8 @@
     return null
   }
 
+  // 输入: video_id
+  // 输出: 合适的视频文件名 (但是没后缀，后缀自己加)
   function get_filename_by_video_id(video_id) {
     var obj = video_id_to_obj(video_id)
     var rank = obj.displayRank
