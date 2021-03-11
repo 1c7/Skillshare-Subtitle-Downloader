@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name:zh-CN   Skillshare 字幕下载 v6
-// @name         Skillshare Subtitle Downloader v6
+// @name:zh-CN   Skillshare 字幕下载 v7
+// @name         Skillshare Subtitle Downloader v7
 // @namespace    https://greasyfork.org/users/5711
-// @version      6
+// @version      7
 // @description:zh-CN  下载 Skillshare 的字幕文件 (.srt 文件)
 // @description  Download Skillshare Subtitle as .srt file
 // @author       Zheng Cheng
@@ -16,8 +16,24 @@
 // 1. 下载一门课程全部字幕（多个 .srt 文件）原理是利用 transcriptCuesArray，字幕数据都在里面，进行格式转换+保存即可
 // 2. 下载当前视频的字幕（一个 .srt 文件）原理是用 videojs 里 textTracks 的 cue，进行格式转换+保存即可
 
+// [更新日志]
+// v7（2021-3-11）: 可以下载视频，包括当前视频，以及从当前视频开始一直到最后一个视频。
+
 (function () {
   'use strict';
+
+  // 【配置项】
+  // 如果想 "从当前视频开始，一直下载到最后一个视频"
+  // 请填入 POLICY_KEY
+  const POLICY_KEY = null
+
+  // 举例:
+  // const POLICY_KEY = 'BCpkADawqM2OOcM6njnM7hf9EaK6lIFlqiXB0iWjqGWUQjU7R8965xUvIQNqdQbnDTLz0IAO7E6Ir2rIbXJtFdzrGtitoee0n1XXRliD-RH9A-svuvNW9qgo3Bh34HEZjXjG4Nml4iyz3KqF'
+  
+  // 说明
+  // policy_key 仅用于下载全部视频, 其他功能不需要
+  // 只能从一个获取视频数据的 http 请求里的请求头/响应头拿到。应该是代码构建的，页面里没法搜索到。
+  // 就只能这样写死了。
 
   // 初始化一些必须的变量
   var sessions = null;
@@ -25,6 +41,8 @@
   var div = document.createElement('div');
   var button = document.createElement('button'); // 下载全部字幕的按钮
   var button2 = document.createElement('button'); // 下载当前视频字幕的按钮
+  var button3 = document.createElement('button'); // 下载当前视频的按钮
+  var button4 = document.createElement('button'); // 下载全部视频的按钮
   var title_element = document.querySelector("div.class-details-header-title");
 
   function insertAfter(newNode, referenceNode) {
@@ -38,13 +56,17 @@
     var subtitle_count = subtitle_ids.length
 
     // 此按钮点击后：下载这门课的所有字幕 (得到多个文件)
-    var button_text = `下载这门课的所有字幕 (${subtitle_count} 个 .srt 文件)`;
+    var button_text = `下载所有字幕 (${subtitle_count} 个 .srt 文件)`;
     button.textContent = button_text;
     button.addEventListener('click', download_subtitles);
 
     // 此按钮点击后：下载当前视频的一个字幕 (得到一个文件)
     button2.textContent = get_download_current_episode_button_text()
     button2.addEventListener('click', download_current_episode_subtitles);
+
+    // 此按钮点击后：下载当前视频
+    button3.textContent = get_download_current_video_button_text()
+    button3.addEventListener('click', download_current_episode_video);
 
     var button_css = `
       font-size: 16px;
@@ -63,12 +85,68 @@
 
     button.setAttribute('style', button_css);
     button2.setAttribute('style', button2_css);
+    button3.setAttribute('style', button2_css);
     div.setAttribute('style', div_css);
 
     div.appendChild(button);
     div.appendChild(button2);
+    div.appendChild(button3);
+
+    if (POLICY_KEY != null) {
+      button4.textContent = "从当前视频开始, 下载到最后一个视频"
+      button4.addEventListener('click', download_all_video);
+      button4.setAttribute('style', button2_css);
+      div.appendChild(button4);
+    }
 
     insertAfter(div, title_element);
+  }
+
+  // 下载当前这一集的视频
+  function download_current_episode_video() {
+    var vjs = videojs(document.querySelector('video'))
+    var video_link = null;
+    var video_type = null;
+
+    // 在数组里找到 *.mp4 的链接
+    var video_link = find_video_link(vjs.mediainfo.sources)
+
+    if (video_link != null) {
+      var filename = `${get_filename()}.mp4`
+      fetch(video_link)
+        .then(res => res.blob())
+        .then(blob => {
+          downloadString(blob, 'video/mp4', filename);
+        });
+    }
+  }
+
+  function download_video(video_link, filetype, filename) {
+    return new Promise((resolve, reject) => {
+      fetch(video_link)
+        .then(res => res.blob())
+        .then(blob => {
+          downloadString(blob, filetype, filename);
+          resolve(true);
+        }).catch(err => reject(err));
+    })
+  }
+
+  // 输入: sources 数组, 来自于网络请求的返回
+  // 输出: (字符串) 一个视频链接
+  function find_video_link(sources) {
+    var video_link = null;
+
+    // 在数组里找到 *.mp4 的链接
+    var array = sources;
+    for (var i = 0; i < array.length; i++) {
+      var s = array[i];
+      if (s.container && s.container == 'MP4' && s.height >= 720) {
+        video_link = s.src;
+        break;
+      }
+    }
+    return video_link
   }
 
   // 把 cue 遍历一下，得到一个特定格式的对象数组
@@ -178,6 +256,180 @@
       // 如果不 sleep，下载大概11个文件就会停下来（不会报错，但就是停下来了）
       // sleep 可以把全部42个文件下载下来
     }
+  }
+
+  // 下载全部视频
+  async function download_all_video() {
+    // 发请求给
+    // https://edge.api.brightcove.com/playback/v1/accounts/3695997568001/videos/6234379709001
+    // var example_return = {
+    //   "poster": "https://cf-images.us-east-1.prod.boltdns.net/v1/jit/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/main/1280x720/5m3s296ms/match/image.jpg",
+    //   "thumbnail": "https://cf-images.us-east-1.prod.boltdns.net/v1/jit/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/main/160x90/5m3s296ms/match/image.jpg",
+    //   "poster_sources": [{
+    //     "src": "https://cf-images.us-east-1.prod.boltdns.net/v1/jit/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/main/1280x720/5m3s296ms/match/image.jpg"
+    //   }],
+    //   "thumbnail_sources": [{
+    //     "src": "https://cf-images.us-east-1.prod.boltdns.net/v1/jit/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/main/160x90/5m3s296ms/match/image.jpg"
+    //   }],
+    //   "description": null,
+    //   "tags": [],
+    //   "cue_points": [],
+    //   "custom_fields": {},
+    //   "account_id": "3695997568001",
+    //   "sources": [{
+    //     "codecs": "avc1,mp4a",
+    //     "ext_x_version": "3",
+    //     "src": "http://manifest.prod.boltdns.net/manifest/v1/hls/v3/clear/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/10s/master.m3u8?fastly_token=NjA0YTJmODlfNDM1MjYyMjJmY2QzMWJmZTkzNTg3MWU1MmFjMTAwOGU2ODQwNjBhMjNiYWY5YmFiYWJmNjk0YzA2ZGRjZTQ5ZA%3D%3D",
+    //     "type": "application/x-mpegURL"
+    //   }, {
+    //     "codecs": "avc1,mp4a",
+    //     "ext_x_version": "3",
+    //     "src": "https://manifest.prod.boltdns.net/manifest/v1/hls/v3/clear/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/10s/master.m3u8?fastly_token=NjA0YTJmODlfNDM1MjYyMjJmY2QzMWJmZTkzNTg3MWU1MmFjMTAwOGU2ODQwNjBhMjNiYWY5YmFiYWJmNjk0YzA2ZGRjZTQ5ZA%3D%3D",
+    //     "type": "application/x-mpegURL"
+    //   }, {
+    //     "codecs": "avc1,mp4a",
+    //     "ext_x_version": "4",
+    //     "src": "http://manifest.prod.boltdns.net/manifest/v1/hls/v4/clear/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/10s/master.m3u8?fastly_token=NjA0YTJmODlfYTcyZDI3Njg5MjhjZTRhY2I1ZjFkOWM5YjU4OGQzZjg5ZjhkZjI3YWNmODI5MDg5YTRiZDMyYjRmMGZkYWY3OQ%3D%3D",
+    //     "type": "application/x-mpegURL"
+    //   }, {
+    //     "codecs": "avc1,mp4a",
+    //     "ext_x_version": "4",
+    //     "src": "https://manifest.prod.boltdns.net/manifest/v1/hls/v4/clear/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/10s/master.m3u8?fastly_token=NjA0YTJmODlfYTcyZDI3Njg5MjhjZTRhY2I1ZjFkOWM5YjU4OGQzZjg5ZjhkZjI3YWNmODI5MDg5YTRiZDMyYjRmMGZkYWY3OQ%3D%3D",
+    //     "type": "application/x-mpegURL"
+    //   }, {
+    //     "codecs": "avc1,mp4a",
+    //     "profiles": "urn:mpeg:dash:profile:isoff-live:2011",
+    //     "src": "http://manifest.prod.boltdns.net/manifest/v1/dash/live-baseurl/clear/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/6s/manifest.mpd?fastly_token=NjA0YTJmODlfMjViY2ZlZGM0MDczZmJlZmE2MzNhODVhYzYwM2QwODIyYTk1NGYxNDE5ZmQ4N2Q4ZDg1YjM5YTBmODNhYmE5NQ%3D%3D",
+    //     "type": "application/dash+xml"
+    //   }, {
+    //     "codecs": "avc1,mp4a",
+    //     "profiles": "urn:mpeg:dash:profile:isoff-live:2011",
+    //     "src": "https://manifest.prod.boltdns.net/manifest/v1/dash/live-baseurl/clear/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/6s/manifest.mpd?fastly_token=NjA0YTJmODlfMjViY2ZlZGM0MDczZmJlZmE2MzNhODVhYzYwM2QwODIyYTk1NGYxNDE5ZmQ4N2Q4ZDg1YjM5YTBmODNhYmE5NQ%3D%3D",
+    //     "type": "application/dash+xml"
+    //   }, {
+    //     "avg_bitrate": 1407000,
+    //     "codec": "H264",
+    //     "container": "MP4",
+    //     "duration": 606592,
+    //     "height": 720,
+    //     "size": 107252789,
+    //     "src": "http://bcbolt446c5271-a.akamaihd.net/media/v1/pmp4/static/clear/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/c7d34e08-b1d7-468d-91b8-c72987f80fcb/main.mp4?akamai_token=exp=1615474569~acl=/media/v1/pmp4/static/clear/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/c7d34e08-b1d7-468d-91b8-c72987f80fcb/main.mp4*~hmac=2aea87178e6e66183d8d4b0bfd604850cdf627218ab577693ff77d9d568324bf",
+    //     "width": 1280
+    //   }, {
+    //     "avg_bitrate": 1407000,
+    //     "codec": "H264",
+    //     "container": "MP4",
+    //     "duration": 606592,
+    //     "height": 720,
+    //     "size": 107252789,
+    //     "src": "https://bcbolt446c5271-a.akamaihd.net/media/v1/pmp4/static/clear/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/c7d34e08-b1d7-468d-91b8-c72987f80fcb/main.mp4?akamai_token=exp=1615474569~acl=/media/v1/pmp4/static/clear/3695997568001/8d273617-b8f1-42ea-98a6-d36139552e2f/c7d34e08-b1d7-468d-91b8-c72987f80fcb/main.mp4*~hmac=2aea87178e6e66183d8d4b0bfd604850cdf627218ab577693ff77d9d568324bf",
+    //     "width": 1280
+    //   }],
+    //   "name": "Stocks App: Generic Network Manager",
+    //   "reference_id": null,
+    //   "long_description": null,
+    //   "duration": 606592,
+    //   "economics": "AD_SUPPORTED",
+    //   "text_tracks": [{
+    //     "id": "c807c2f3-ae06-454c-9048-137a294fa75a",
+    //     "account_id": "3695997568001",
+    //     "src": "https://www.skillshare.com/transcripts/a6b235a0-0130-4651-94ba-de065673f7b2/text.vtt?ts=20210222171013",
+    //     "srclang": "en",
+    //     "label": "English",
+    //     "kind": "captions",
+    //     "mime_type": "text/vtt",
+    //     "asset_id": null,
+    //     "sources": [{
+    //       "src": "https://www.skillshare.com/transcripts/a6b235a0-0130-4651-94ba-de065673f7b2/text.vtt?ts=20210222171013"
+    //     }],
+    //     "default": true
+    //   }],
+    //   "published_at": "2021-02-22T16:51:12.376Z",
+    //   "created_at": "2021-02-22T16:51:12.362Z",
+    //   "updated_at": "2021-02-22T17:10:13.636Z",
+    //   "offline_enabled": false,
+    //   "link": null,
+    //   "id": "6234379709001",
+    //   "ad_keys": null
+    // }
+
+    // https://edge.api.brightcove.com/playback/v1/accounts/3695997568001/videos/6234379709001
+    // 分析一下: 3695997568001 和 6234379709001 是什么？
+    // 返回的数据可以看到是 account_id: "3695997568001"，那么这个是当前账户的 id
+    // 第二个 6234379709001 应该是视频的 id
+    // 问：这两项数据如何获取？
+
+    // 如何获取 account_id？
+    // SS.serverBootstrap.pageData.videoPlayerData.brightcoveAccountId
+
+    // 如何获取 video_id？
+    // pageData.videoPlayerData.units[0].sessions[0].videoId
+    // videoId: "bc:6234378710001"
+
+    // 如果要下载全部视频
+    // 思路：遍历 pageData.videoPlayerData.units[0].sessions
+    // 里面每一个就是一个视频，然后发请求获得数据，然后下载
+    // var sessions = unsafeWindow.SS.serverBootstrap.pageData.videoPlayerData.units[0].sessions
+    // for (var i = 0; i < sessions.length; i++) {
+    //   var session = sessions[i];
+    //   var video_id = session.videoId.split(':')[1];
+    //   var response = await get_single_video_data(video_id);
+    //   var video_link = find_video_link(response.sources);
+    //   var filename = safe_filename(response.name)
+    //   await download_video(video_link, 'video/mp4', filename)
+    // }
+
+    // 假设从当前视频开始下载
+    var startingSession = unsafeWindow.SS.serverBootstrap.pageData.videoPlayerData.startingSession
+    var sessions = unsafeWindow.SS.serverBootstrap.pageData.videoPlayerData.units[0].sessions
+    for (var i = 0; i < sessions.length; i++) {
+      var session = sessions[i];
+      var displayRank = session.displayRank;
+      if (displayRank >= startingSession.displayRank) {
+        var video_id = session.videoId.split(':')[1]; // 视频 ID
+        var response = await get_single_video_data(video_id); // 拿到 JSON 返回
+
+        var video_link = find_video_link(response.sources); // 视频链接
+        var rank = session.displayRank // 视频编号
+        var filename = `${rank}. ${safe_filename(response.name)}.mp4`; // 文件名
+        if (video_link.startsWith('http://')) {
+          video_link = video_link.replace('http://', 'https://')
+        }
+        console.log(video_link);
+        console.log(filename);
+        await download_video(video_link, 'video/mp4', filename); // 下载
+      }
+    }
+  }
+
+  // 返回账户 ID
+  // 举例: 3695997568001
+  function get_account_id() {
+    return unsafeWindow.SS.serverBootstrap.pageData.videoPlayerData.brightcoveAccountId;
+  }
+
+  // 输入: id
+  // 输出: JSON (视频数据)
+  function get_single_video_data(video_id) {
+    // https://edge.api.brightcove.com/playback/v1/accounts/3695997568001/videos/6234379709001
+    var account_id = get_account_id();
+    var url = `https://edge.api.brightcove.com/playback/v1/accounts/${account_id}/videos/${video_id}`
+    return new Promise(function (resolve, reject) {
+      fetch(url, {
+          headers: {
+            // 'x-csrftoken': csrf(),
+            // 'accept': 'application/json, text/javascript, */*; q=0.01'
+            "Accept": `application/json;pk=${POLICY_KEY}`
+            // Policy-Key-Raw: BCpkADawqM2OOcM6njnM7hf9EaK6lIFlqiXB0iWjqGWUQjU7R8965xUvIQNqdQbnDTLz0IAO7E6Ir2rIbXJtFdzrGtitoee0n1XXRliD-RH9A-svuvNW9qgo3Bh34HEZjXjG4Nml4iyz3KqF
+          }
+        })
+        .then(response => response.json())
+        .then(data => {
+          resolve(data)
+        }).catch(e => {
+          reject(e);
+        })
+    })
   }
 
   // 把指定格式的数组
@@ -308,7 +560,12 @@
   })
 
   function get_download_current_episode_button_text() {
-    return `下载当前集 (${get_filename()}.srt)`
+    return `下载当前字幕 (.srt)`
+    // return `下载当前字幕 (${get_filename()}.srt)`
+  }
+
+  function get_download_current_video_button_text() {
+    return `下载当前视频 (.mp4)`
   }
 
   // 返回当前正在播放的视频标题
@@ -337,5 +594,5 @@
     }
   }
 
-  setTimeout(main, 3000);
+  setTimeout(main, 2000);
 })();
