@@ -145,7 +145,7 @@
   function find_video_link(sources) {
     var video_link = null;
 
-    // 在数组里找到 *.mp4 的链接
+    // 找 .mp4 的链接
     var array = sources;
     for (var i = 0; i < array.length; i++) {
       var s = array[i];
@@ -301,9 +301,12 @@
       var displayRank = session.displayRank;
       if (displayRank >= startingSession.displayRank) { // 从当前视频开始下载（包括当前视频）一直下载到最后一个
         var video_id = session.videoId.split(':')[1]; // 视频 ID
-        var response = await get_single_video_data(video_id); // 拿到 JSON 返回
 
+        var response = await get_single_video_data(video_id); // 拿到 JSON 返回
         var video_link = find_video_link(response.sources); // 视频链接
+        // 一般返回的数据里。sources 会有 6-8 条视频链接，有 m3u8 和 mp4 的。
+        // 浏览器里下载 m3u8 的视频没啥好办法，所以我们找那条 mp4 的链接。
+
         var filename = `${get_filename_by_video_id(response.id)}.mp4`; // 文件名
 
         if (video_link.startsWith('http://')) {
