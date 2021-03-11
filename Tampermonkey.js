@@ -7,7 +7,7 @@
 // @description  Download Skillshare Subtitle as .srt file
 // @author       Zheng Cheng
 // @match        https://www.skillshare.com/classes/*
-// @run-at       document-end
+// @run-at       document-start
 // @grant        unsafeWindow
 // ==/UserScript==
 
@@ -22,14 +22,23 @@
 (function () {
   'use strict';
 
-  // 【配置项】
-  // 如果想 "从当前视频开始，一直下载到最后一个视频"
-  // 请填入 POLICY_KEY
-  const POLICY_KEY = null
+  // 有的 http 请求，比如获得视频信息的那个 https://edge.api.brightcove.com/playback/v1/accounts/3695997568001/videos/6173466475001
+  // 需要一个请求头，Accept: application/json;pk=BCpkADawqM2OOcM6njnM7hf9EaK6lIFlqiXB0iWjqGWUQjU7R8965xUvIQNqdQbnDTLz0IAO7E6Ir2rIbXJtFdzrGtitoee0n1XXRliD-RH9A-svuvNW9qgo3Bh34HEZjXjG4Nml4iyz3KqF
+  // pk 是 policy key 的缩写（因为响应头里面明确写了 Policy-Key-Raw )
+  var request_header_accept = null
 
-  // 举例:
-  // const POLICY_KEY = 'BCpkADawqM2OOcM6njnM7hf9EaK6lIFlqiXB0iWjqGWUQjU7R8965xUvIQNqdQbnDTLz0IAO7E6Ir2rIbXJtFdzrGtitoee0n1XXRliD-RH9A-svuvNW9qgo3Bh34HEZjXjG4Nml4iyz3KqF'
-  
+  // 由于这个 Accept: application/json;pk= 完全无法在页面中获取到，我们只能使用这样的截取方式
+  XMLHttpRequest.prototype.real_setRequestHeader = XMLHttpRequest.prototype.setRequestHeader
+  XMLHttpRequest.prototype.setRequestHeader = function (header, value) {
+    // console.log(header, value);
+    if (header == 'Accept' && value.startsWith('application/json;pk=')) {
+      request_header_accept = value; // 如果两个条件都对，就存起来
+      console.log(`找到了!`);
+      console.log(request_header_accept);
+    }
+    this.real_setRequestHeader(header, value);
+  }
+
   // 说明
   // policy_key 仅用于下载全部视频, 其他功能不需要
   // 只能从一个获取视频数据的 http 请求里的请求头/响应头拿到。应该是代码构建的，页面里没法搜索到。
@@ -96,12 +105,11 @@
     div.appendChild(button2);
     div.appendChild(button3);
 
-    if (POLICY_KEY != null) {
-      button4.textContent = "从当前视频开始, 下载到最后一个视频"
-      button4.addEventListener('click', download_all_video);
-      button4.setAttribute('style', button2_css);
-      div.appendChild(button4);
-    }
+    // 按钮4
+    button4.textContent = "从当前视频开始, 下载到最后一个视频"
+    button4.addEventListener('click', download_all_video);
+    button4.setAttribute('style', button2_css);
+    div.appendChild(button4);
 
     insertAfter(div, title_element);
   }
@@ -421,10 +429,7 @@
     return new Promise(function (resolve, reject) {
       fetch(url, {
           headers: {
-            // 'x-csrftoken': csrf(),
-            // 'accept': 'application/json, text/javascript, */*; q=0.01'
-            "Accept": `application/json;pk=${POLICY_KEY}`
-            // Policy-Key-Raw: BCpkADawqM2OOcM6njnM7hf9EaK6lIFlqiXB0iWjqGWUQjU7R8965xUvIQNqdQbnDTLz0IAO7E6Ir2rIbXJtFdzrGtitoee0n1XXRliD-RH9A-svuvNW9qgo3Bh34HEZjXjG4Nml4iyz3KqF
+            "Accept": request_header_accept
           }
         })
         .then(response => response.json())
