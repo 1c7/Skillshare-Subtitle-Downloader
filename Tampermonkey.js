@@ -35,6 +35,10 @@
   // 只能从一个获取视频数据的 http 请求里的请求头/响应头拿到。应该是代码构建的，页面里没法搜索到。
   // 就只能这样写死了。
 
+  // 获取方法 Chrome 开发者工具 -> Network -> 搜索 edge.api.brightcove.com/playback
+  // 应该只会显示一条，复制 Policy-Key-Raw: BCpkADawqM2OOcM6njnM7hf9EaK6lIFlqiXB0iWjqGWUQjU7R8965xUvIQNqdQbnDTLz0IAO7E6Ir2rIbXJtFdzrGtitoee0n1XXRliD-RH9A-svuvNW9qgo3Bh34HEZjXjG4Nml4iyz3KqF
+  // 冒号后面这一段
+
   // 初始化一些必须的变量
   var sessions = null;
   var transcriptCuesArray = null;
