@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name:zh-CN   Skillshare 字幕下载 v9
-// @name         Skillshare Subtitle Downloader v9
+// @name:zh-CN   Skillshare 字幕下载 v10
+// @name         Skillshare Subtitle Downloader v10
 // @namespace    https://greasyfork.org/users/5711
-// @version      9
+// @version      10
 // @description:zh-CN  支持下载 Skillshare 的字幕 (.srt 文件) 以及 下载视频 (.mp4)
 // @description  Download Skillshare Subtitle as .srt file
 // @author       Zheng Cheng
@@ -271,7 +271,7 @@
     var obj = id_to_obj(id);
     var rank = obj.displayRank;
     var title = obj.title
-    var filename = `${rank}.${safe_filename(title)}.srt`
+    var filename = `${rank}. ${safe_filename(title)}.srt`
     return filename
   }
 
